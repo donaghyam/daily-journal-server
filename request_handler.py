@@ -1,6 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
-from views import get_all_entries, get_single_entry, delete_entry
+from views import get_all_entries, get_single_entry, delete_entry, search_entry, create_entry, update_entry
 
 # Here's a class. It inherits from another class.
 # For now, think of a class as a container for functions that
@@ -86,7 +86,17 @@ class HandleRequests(BaseHTTPRequestHandler):
                     response = f"{get_single_entry(id)}"
                 else:
                     response = f"{get_all_entries()}"
-            
+        
+        # Response from parse_url() is a tuple with 3
+        # items in it, which means the request was for
+        # `/resource?parameter=value`
+        elif len(parsed) == 3:
+            ( resource, key, value ) = parsed
+
+            # Is the resource `entries` and was there a
+            # entry as a filtering value?
+            if key == "entry" and resource == "entries":
+                response = search_entry(value)
         self.wfile.write(response.encode())
         
     def do_DELETE(self):
@@ -102,6 +112,56 @@ class HandleRequests(BaseHTTPRequestHandler):
         
         # Encode the new animal and send in response
         self.wfile.write("".encode())
+        
+    # Here's a method on the class that overrides the parent's method.
+    # It handles any POST request.
+    def do_POST(self):
+        self._set_headers(201)
+        content_len = int(self.headers.get('content-length', 0))
+        post_body = self.rfile.read(content_len)
+
+        # Convert JSON string to a Python dictionary
+        post_body = json.loads(post_body)
+
+        # Parse the URL
+        (resource, id) = self.parse_url(self.path)
+
+        # Initialize new entry
+        response = None
+
+        # Add a new entry to the list. Don't worry about
+        # the orange squiggle, you'll define the create_entry
+        # function next.
+        if resource == "entries":
+            response = create_entry(post_body)
+
+        # Encode the new entry and send in response
+        self.wfile.write(f"{response}".encode())
+        
+    def do_PUT(self):
+        content_len = int(self.headers.get('content-length', 0))
+        post_body = self.rfile.read(content_len)
+        post_body = json.loads(post_body)
+
+        # Parse the URL
+        (resource, id) = self.parse_url(self.path)
+
+        success = False
+
+        if resource == "entries":
+            success = update_entry(id, post_body)
+        # rest of the elif's
+
+        if success:
+            self._set_headers(204)
+        else:
+            self._set_headers(404)
+
+        self.wfile.write("".encode())
+
+    # Here's a method on the class that overrides the parent's method.
+    # It handles any PUT request.
+    
        
 # This function is not inside the class. It is the starting
 # point of this application.

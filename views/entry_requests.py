@@ -1,6 +1,6 @@
 import sqlite3
 import json
-from models import Entries
+from models import Entries, Moods, Tags, Entry_Tag
 
 def get_all_entries():
     # Open a connection with the database
@@ -19,7 +19,7 @@ def get_all_entries():
         FROM Entries e
         """)
         
-        # Initialize emptry list to hold all entries
+        # Initialize empty list to hold all entries
         entries = []
         
         # Convert rows of data into a Python list
@@ -48,16 +48,25 @@ def get_single_entry(id):
         SELECT
             e.id,
             e.entry,
-            e.mood_id
+            e.mood_id,
+            m.mood
         FROM Entries e
+        JOIN Moods m
+            ON m.id = e.mood_id
         WHERE e.id = ?
         """, ( id, ))
         
+        # Initialize an empty list to hold all entry representations
+        entry = []
+        
         # Load the single result into memory
         data = db_cursor.fetchone()
-        
-        # Create an entry intstance from the current row
+
         entry = Entries(data['id'], data['entry'], data['mood_id'])
+        
+        mood = Moods(data['id'], data['mood'])
+        
+        entry.mood = mood.__dict__
         
         return json.dumps(entry.__dict__)
     
@@ -70,5 +79,81 @@ def delete_entry(id):
         WHERE id = ?
         """, (id, ))
 
+def search_entry(keyword):
+    with sqlite3.connect("./dailyjournal.sqlite3") as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
         
+        db_cursor.execute("""
+        SELECT
+            e.id,
+            e.entry,
+            e.mood_id
+        FROM Entries e
+        WHERE e.entry LIKE ?
+        """, ( '%'+ keyword + '%', ))
         
+        # Load the single result into memory
+        data = db_cursor.fetchone()
+        
+        # Create an entry intstance from the current row
+        entry = Entries(data['id'], data['entry'], data['mood_id'])
+        
+        return json.dumps(entry.__dict__)
+
+def create_entry(new_entry):
+    with sqlite3.connect("./dailyjournal.sqlite3") as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+        
+        db_cursor.execute("""
+        INSERT INTO Entries
+            ( entry, mood_id )
+        VALUES
+            ( ?, ? );
+        """, (new_entry['entry'], new_entry['mood_id'], ))
+        
+        # The `lastrowid` property on the cursor will return
+        # the primary key of the last thing that got added to
+        # the database.
+        id = db_cursor.lastrowid
+        
+        dataset = db_cursor.fetchall()
+    
+        for tag_id in new_entry['tags']:
+            db_cursor.execute("""
+            INSERT INTO Entry_Tag
+                ( entry_id, tag_id )
+            VALUES
+                ( ?, ? );
+            """, (id, tag_id, ))
+
+        # Add the `id` property to the entry dictionary that
+        # was sent by the client so that the client sees the
+        # primary key in the response.
+        new_entry['id'] = id
+
+    return json.dumps(new_entry)
+
+def update_entry(id, new_entry):
+    with sqlite3.connect("./dailyjournal.sqlite3") as conn:
+        db_cursor = conn.cursor()
+        
+        db_cursor.execute("""
+        UPDATE Entries
+            SET
+                entry = ?,
+                mood_id = ?
+        WHERE id = ?
+        """, (new_entry['entry'], new_entry['mood_id'], id, ))
+        
+        # Were any rows affected?
+        # Did the client send an `id` that exists?
+        rows_affected = db_cursor.rowcount
+
+    if rows_affected == 0:
+        # Forces 404 response by main module
+        return False
+    else:
+        # Forces 204 response by main module
+        return True
