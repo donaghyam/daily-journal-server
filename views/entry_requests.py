@@ -31,6 +31,29 @@ def get_all_entries():
             # Create an Entries instance from the current row
             entry = Entries(row['id'], row['entry'], row['mood_id'])
             
+            db_cursor.execute("""
+                SELECT
+                    et.entry_id,
+                    et.tag_id,
+                    t.name name
+                FROM Entry_Tag et
+                JOIN Tags t
+                    ON t.id = et.tag_id
+                WHERE et.entry_id = ?
+                """, (row['id'], ))
+            
+            tag_set = db_cursor.fetchall()
+            
+            tags = []
+            
+            for tag in tag_set:
+                
+                result = Tags(tag['tag_id'], tag['name'])
+                
+                tags.append(result.__dict__)
+            
+            entry.tags = tags
+            
             # Add the dictionary representation of the entry to the list
             entries.append(entry.__dict__)
             
@@ -118,6 +141,8 @@ def create_entry(new_entry):
         # the database.
         id = db_cursor.lastrowid
         
+        
+        
         dataset = db_cursor.fetchall()
     
         for tag_id in new_entry['tags']:
@@ -127,11 +152,6 @@ def create_entry(new_entry):
             VALUES
                 ( ?, ? );
             """, (id, tag_id, ))
-
-        # Add the `id` property to the entry dictionary that
-        # was sent by the client so that the client sees the
-        # primary key in the response.
-        new_entry['id'] = id
 
     return json.dumps(new_entry)
 

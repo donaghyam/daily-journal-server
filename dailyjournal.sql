@@ -42,3 +42,35 @@ INSERT INTO `Tags` VALUES (null, "JavaScript");
 INSERT INTO `Tags` VALUES (null, "SQL");
 INSERT INTO `Tags` VALUES (null, "Data");
 INSERT INTO `Tags` VALUES (null, "Syntax");
+
+SELECT
+    e.id,
+    e.entry,
+    e.mood_id,
+    t.name
+FROM Entries e
+JOIN Entry_Tag et
+    ON et.entry_id = e.id
+JOIN Tags t
+    ON t.id = et.tag_id
+
+SELECT
+    t.id tagId,
+    t.name tagName,
+    e.entry
+FROM Tags t
+JOIN Entry_Tag et
+    ON et.tag_id = tagId
+JOIN Entries e
+    ON e.id = et.entry_id
+WHERE et.entry_id = e.id
+
+SELECT
+    t.id tagId,
+    t.name tagName
+FROM Tags t
+JOIN Entry_Tag et
+    ON et.tag_id = tagId
+JOIN Entries e
+    ON e.id = et.entry_id
+WHERE et.entry_id = e.id
